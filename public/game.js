@@ -1,4 +1,6 @@
 'use strict';
+// 오락실 튜토리얼이 '진짜로 일어난 일'을 알아채는 신호 (arcade/public/tutorial.js 가 듣는다. 튜토리얼이 아니면 아무도 안 듣는다)
+const tutorialSignal = (type) => window.dispatchEvent(new CustomEvent('arcade:tutorial', { detail: { type } }));
 
 // 알까기: 화면·입력·소리·온라인. 규칙·물리·컴퓨터 상대는 logic.js (LOGIC_ALKKAGI), 방·매칭은 server.js
 (() => {
@@ -253,8 +255,8 @@ function release() {
   const id = drag.id;
   drag = null;
   if (!v || !canShoot()) return;
-  if (mode === 'online') { pending = true; net.send('shoot', { id, vx: v.vx, vy: v.vy }); updateHud(); return; }
-  if (L.shoot(st, id, v.vx, v.vy)) handleEvents();
+  if (mode === 'online') { pending = true; tutorialSignal('shoot'); net.send('shoot', { id, vx: v.vx, vy: v.vy }); updateHud(); return; }
+  if (L.shoot(st, id, v.vx, v.vy)) { tutorialSignal('shoot'); handleEvents(); }
 }
 canvas.addEventListener('pointerup', release);
 canvas.addEventListener('pointercancel', () => { drag = null; });
