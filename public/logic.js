@@ -118,9 +118,11 @@ function settle(st) {
   st.events.push({ type: 'turn', turn: st.turn });
 }
 
-// 멈출 때까지 굴린다 (컴퓨터가 수를 읽을 때, 시험할 때)
+// 멈출 때까지 굴린다 (컴퓨터가 수를 읽을 때, 온라인 서버, 시험). 굴린 시간(초)을 돌려준다
 function runToRest(st, dt = 1 / 60, maxT = 20) {
-  for (let t = 0; t < maxT && st.phase === 'moving'; t += dt) step(st, dt);
+  let t = 0;
+  for (; t < maxT && st.phase === 'moving'; t += dt) step(st, dt);
+  return t;
 }
 
 const clone = (st) => ({ ...st, stones: st.stones.map((s) => ({ ...s })), events: [] });

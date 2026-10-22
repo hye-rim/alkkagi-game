@@ -2,7 +2,7 @@
 // 알까기 규칙·물리·컴퓨터 상대 시험. 실행: node test/logic.test.js
 const test = require('node:test');
 const assert = require('node:assert');
-const L = require('../logic.js');
+const L = require('../public/logic.js');
 
 const { B, R, BLACK, WHITE } = L;
 // 원하는 알만 남긴 판
