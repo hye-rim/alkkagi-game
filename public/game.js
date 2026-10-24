@@ -78,7 +78,7 @@ let pending = false;              // 내 샷을 보내고 서버 답을 기다�
 let turnEnd = 0, netDown = false, recorded = '';
 const cpuTurn = () => mode === 'cpu' && st.turn === WHITE;
 const sideName = (s) => (s === BLACK ? '흑' : '백');
-const mySide = () => (mode === 'online' ? (room ? room.you : -1) : mode === 'cpu' ? BLACK : st.turn);
+const mySide = () => (mode === 'online' ? (room ? room.you : -1) : BLACK);
 // 지금 내가 알을 잡아 튕길 수 있는가
 function canShoot() {
   if (ui !== 'play' || st.phase !== 'aim') return false;
@@ -184,8 +184,7 @@ function updateHud() {
     t = me ? `${room.you === BLACK ? '⚫' : '⚪'} 내 차례 · ${sec}초` : `${opp ? esc(opp.name) : '상대'} 차례 · ${sec}초${opp && !opp.online ? ' (끊김)' : ''}`;
   } else if (mode === 'online' && room && room.state === 'over') t = room.winner === room.you ? '승리!' : '패배';
   else if (st.phase === 'over') t = `${sideName(st.winner)} 승리!`;
-  else if (mode === 'cpu') t = st.turn === BLACK ? '⚫ 내 차례' : '⚪ 컴퓨터 차례';
-  else t = `${st.turn === BLACK ? '⚫' : '⚪'} ${sideName(st.turn)} 차례`;
+  else t = st.turn === BLACK ? '⚫ 내 차례' : '⚪ 컴퓨터 차례';
   $('turn').innerHTML = t;
   $('resignBtn').style.display = mode === 'online' && room && room.state === 'playing' ? '' : 'none';
   $('hint').textContent = ui !== 'play' ? '' : canShoot() ? '내 알을 뒤로 끌었다 놓으면 튕겨요 · 많이 끌수록 세게' : '';
@@ -266,7 +265,7 @@ const overlayOpen = () => !$('overlay').classList.contains('hidden');
 function showOverlay(html) { $('overlay').innerHTML = html; $('overlay').classList.remove('hidden'); }
 function hideOverlay() { $('overlay').classList.add('hidden'); }
 
-// ---------- 컴퓨터·둘이서 ----------
+// ---------- 컴퓨터 ----------
 function start(m, lv) {
   leaveOnline();
   mode = m; level = lv || level;
@@ -279,12 +278,12 @@ function showOver() {
   ui = 'over';
   const meWin = mode === 'cpu' && st.winner === BLACK;
   if (meWin) { wins[level]++; store.set(WIN_KEYS[level], String(wins[level])); store.set('alkkagiWins', String(totalWins())); }
-  (mode === 'two' || meWin ? sfx.win : sfx.lose)();
-  const title = mode === 'two' ? `${sideName(st.winner)} 승리! 🏆` : meWin ? '이겼어요! 🎉' : '졌어요 😵';
+  (meWin ? sfx.win : sfx.lose)();
+  const title = meWin ? '이겼어요! 🎉' : '졌어요 😵';
   showOverlay(`
     <h2>${title}</h2>
     <p>남은 알 ⚫ ${L.alive(st, BLACK).length} · ⚪ ${L.alive(st, WHITE).length} · ${st.shots}수</p>
-    ${mode === 'cpu' ? `<span class="tag">${L.LEVELS[level].name} 상대 ${wins[level]}승</span>` : ''}
+    <span class="tag">${L.LEVELS[level].name} 상대 ${wins[level]}승</span>
     <div class="col"><button data-act="again">한 판 더</button><button class="sub" data-act="home">처음으로</button></div>`);
 }
 function showTitle() {
@@ -301,7 +300,6 @@ function showTitle() {
       <button data-act="cpu" data-lv="easy">🤖 컴퓨터랑 · 쉬움<small>나는 흑(먼저)${w('easy')}</small></button>
       <div class="row"><button class="sub" data-act="cpu" data-lv="normal">🤖 보통${w('normal')}</button><button class="sub" data-act="cpu" data-lv="hard">🤖 어려움${w('hard')}</button></div>
       <button class="sub" data-act="online">🌐 온라인 대전${on.w || on.l ? ` · ${on.w || 0}승 ${on.l || 0}패` : ''}</button>
-      <button class="sub" data-act="two">👥 둘이서 (한 화면 번갈아)</button>
     </div>`);
 }
 
@@ -501,7 +499,6 @@ $('overlay').addEventListener('click', (e) => {
   $('overlay').dataset.screen = '';
   const act = btn.dataset.act;
   if (act === 'cpu') start('cpu', btn.dataset.lv);
-  else if (act === 'two') start('two');
   else if (act === 'again') start(mode, level);
   else if (act === 'home') showTitle();
   else if (act === 'online') showOnline();
