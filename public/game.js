@@ -70,6 +70,7 @@ let mode = 'cpu', level = 'normal';
 let drag = null;                  // { id, x, y } 끄는 중인 내 알과 손가락 위치(판 좌표)
 let cpuAt = 0;                    // 컴퓨터가 칠 시각
 let rings = [], splashes = [];
+let lastShot = null;               // 상대가 방금 튕긴 알 { id, side, x, y (출발 자리) } — 끝난 뒤에도 어느 알을 어디서 쳤는지 보여 준다
 // 온라인
 let room = null;                  // 서버가 보낸 방
 let replaying = false;            // 서버가 보낸 샷을 재생하는 중
@@ -120,6 +121,21 @@ function drawStone(s, glow) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   ctx.lineWidth = 2.2 * K / 2; ctx.strokeStyle = INK; ctx.stroke();
 }
+// 상대가 방금 튕긴 알: 출발 자리에서 지금 자리까지 점선, 그 알에는 주황 고리 (내가 쏘면 사라진다)
+function drawLastShot(now) {
+  if (!lastShot || lastShot.side === mySide() || st.phase === 'moving') return;
+  const s = st.stones.find((x) => x.id === lastShot.id);
+  if (!s || !s.alive) return;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,159,28,.9)'; ctx.lineWidth = 3 * K / 2; ctx.setLineDash([5 * K, 5 * K]);
+  ctx.beginPath(); ctx.moveTo(X(lastShot.x), Y(lastShot.y)); ctx.lineTo(X(s.x), Y(s.y)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(X(lastShot.x), Y(lastShot.y), R * K * 0.55, 0, Math.PI * 2); ctx.stroke();
+  ctx.globalAlpha = 0.55 + 0.45 * Math.sin(now / 250);
+  ctx.lineWidth = 3.5 * K / 2;
+  ctx.beginPath(); ctx.arc(X(s.x), Y(s.y), R * K + 5 * K / 2, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
 function drawAim() {
   if (!drag) return;
   const s = st.stones.find((x) => x.id === drag.id);
@@ -157,6 +173,7 @@ function draw(now) {
   for (const r of rings) { ctx.strokeStyle = `rgba(255,255,255,${1 - r.t / 0.3})`; ctx.lineWidth = 3 * K / 2; ctx.beginPath(); ctx.arc(X(r.x), Y(r.y), (R + r.t * 60) * K, 0, Math.PI * 2); ctx.stroke(); }
   const myAim = canShoot();
   for (const s of st.stones) if (s.alive) drawStone(s, myAim && s.side === mySide() && (!drag || drag.id === s.id) && Math.sin(now / 200) > -0.2);
+  drawLastShot(now);
   // 떨어지는 알: 판 밖으로 작아지며 사라진다
   for (const f of splashes) {
     const k = f.t / 0.6;
@@ -216,7 +233,7 @@ function frame(now) {
     } else if (st.phase === 'moving') L.step(st, dt);
     else if (st.phase === 'aim' && cpuTurn() && now >= cpuAt) {
       const m = L.aiChoose(st, level);
-      if (m) L.shoot(st, m.id, m.vx, m.vy);
+      if (m) { const ss = st.stones.find((x) => x.id === m.id); if (ss) lastShot = { id: ss.id, side: ss.side, x: ss.x, y: ss.y }; L.shoot(st, m.id, m.vx, m.vy); }
     }
     if (st.events.length) handleEvents();
     if (replaying && st.phase !== 'moving') finishReplay();
@@ -254,6 +271,7 @@ function release() {
   const id = drag.id;
   drag = null;
   if (!v || !canShoot()) return;
+  lastShot = null;
   if (mode === 'online') { pending = true; tutorialSignal('shoot'); net.send('shoot', { id, vx: v.vx, vy: v.vy }); updateHud(); return; }
   if (L.shoot(st, id, v.vx, v.vy)) { tutorialSignal('shoot'); handleEvents(); }
 }
@@ -270,7 +288,7 @@ function start(m, lv) {
   leaveOnline();
   mode = m; level = lv || level;
   st = L.newGame({ mode, level });
-  ui = 'play'; drag = null; rings = []; splashes = [];
+  ui = 'play'; drag = null; rings = []; splashes = []; lastShot = null;
   hideOverlay();
   updateHud();
 }
@@ -392,7 +410,7 @@ function applyRoom(r) {
   if (newGame || fresh) seenShot = r.shot ? r.shot.seq : 0;
   if (r.state === 'waiting') { ui = 'title'; st = boardFromRoom(r); showWaiting(); return; }
   ui = 'play';
-  if (newGame) { sfx.found(); recorded = ''; rings = []; splashes = []; drag = null; }
+  if (newGame) { sfx.found(); recorded = ''; rings = []; splashes = []; drag = null; lastShot = null; }
   // 새 샷이 왔으면 샷 직전 판에서 같은 물리로 재생한다 (끝나면 finishReplay 가 서버 결과로 맞춘다)
   if (r.shot && r.shot.seq > seenShot && !fresh) {
     seenShot = r.shot.seq;
@@ -400,6 +418,7 @@ function applyRoom(r) {
     g.stones = r.shot.from.map((s) => ({ ...s, vx: 0, vy: 0 }));
     g.phase = 'aim';
     g.turn = (g.stones.find((s) => s.id === r.shot.id) || {}).side;
+    { const o = r.shot.from.find((x) => x.id === r.shot.id); lastShot = o ? { id: o.id, side: o.side, x: o.x, y: o.y } : null; }
     if (L.shoot(g, r.shot.id, r.shot.vx, r.shot.vy)) { st = g; replaying = true; replayAcc = 0; drag = null; hideOverlay(); updateHud(); return; }
   }
   if (!replaying) { st = boardFromRoom(r); afterRoom(); }
